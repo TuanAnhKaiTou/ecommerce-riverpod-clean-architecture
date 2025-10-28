@@ -1,0 +1,14 @@
+appId: com.example.ecommerceRiverpod
+name: Browse Products Flow
+
+steps:
+  - assertVisible:
+      text: "Home"
+  - scroll:
+      direction: DOWN
+  - assertVisible:
+      text: "New Arrivals"
+  - tapOn:
+      text: "View All"
+  - assertVisible:
+      text: "Product Details"

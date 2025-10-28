@@ -47,7 +47,7 @@ jobs:
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: android
           path: build/app/outputs/flutter-apk/*.apk
 
   build-ios:
@@ -92,7 +92,7 @@ jobs:
       - name: Upload iOS IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa
+          name: ios
           path: build/ipa/*.ipa
 
   maestro-test:
@@ -134,7 +134,7 @@ jobs:
       - name: Run Maestro Tests
         run: |
           echo "Starting Maestro local test suite..."
-          maestro test .maestro --format junit --output results.xml || true
+          maestro test .maestro/login.yaml --format junit --output results.xml || true
 
       # --- Upload test results ---
       - name: Upload Maestro test results

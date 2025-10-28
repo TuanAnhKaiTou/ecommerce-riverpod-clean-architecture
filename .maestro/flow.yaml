@@ -1,8 +1,0 @@
-appId: com.example.ecommerceRiverpod
-name: E-commerce App Full Test
-tags:
-  - smoke
-  - end2end
-
-flows:
-  - flows/login.yaml
