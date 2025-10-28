@@ -22,7 +22,7 @@ jobs:
   #         path: build/app/outputs/flutter-apk/app-release.apk
 
   build-ios:
-    needs: build-android
+    # needs: build-android
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
