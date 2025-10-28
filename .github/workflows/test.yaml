@@ -11,7 +11,7 @@ jobs:
   # 🤖 BUILD ANDROID
   # =========================================
   build-android:
-    name: 🤖 Build Android APK
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -60,10 +60,10 @@ jobs:
           path: android_appid.txt
 
   # =========================================
-  # 🍎 BUILD IOS
+  # BUILD IOS
   # =========================================
   build-ios:
-    name: 🍎 Build iOS IPA
+    name: Build iOS IPA
     needs: build-android
     runs-on: macos-latest
 
@@ -135,10 +135,10 @@ jobs:
           path: ios_appid.txt
 
   # =========================================
-  # 🧪 MAESTRO TEST (ANDROID)
+  # MAESTRO TEST (ANDROID)
   # =========================================
   maestro-android:
-    name: 🧪 Maestro Android Tests (with Emulator)
+    name: Maestro Android Tests
     needs: build-android
     runs-on: ubuntu-latest
 
@@ -158,23 +158,52 @@ jobs:
           name: android-appid
           path: .
 
-      - name: Setup Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_7
-          script: echo "✅ Emulator ready"
+      - name: Setup Android environment
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+          sudo apt-get install -y android-sdk
+          sdkmanager --install "platform-tools" "platforms;android-34" "system-images;android-34;google_apis;x86_64" "emulator"
 
       - name: Start Android Emulator
         run: |
-          echo "Booting Android emulator..."
-          nohup emulator -avd test -no-audio -no-window -gpu swiftshader_indirect &
+          echo "🧩 Creating AVD device (Pixel_6_API_34)..."
+          echo "no" | avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d "pixel_6" || true
+
+          echo "🚀 Starting emulator..."
+          nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+
+          echo "⏳ Waiting for ADB device..."
+          adb kill-server || true
+          adb start-server
           adb wait-for-device
-          adb shell input keyevent 82
-          sleep 15
-          echo "✅ Android emulator booted successfully"
+
+          boot_completed=""
+          timeout=300
+          while [ -z "$boot_completed" ] && [ $timeout -gt 0 ]; do
+            boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            if [ "$boot_completed" != "1" ]; then
+              sleep 5
+              timeout=$((timeout - 5))
+              echo "Still waiting... ($timeout sec left)"
+            fi
+          done
+
+          if [ "$boot_completed" != "1" ]; then
+            echo "❌ Emulator failed to boot properly!"
+            adb logcat -d
+            exit 1
+          fi
+
+          adb devices
+          echo "✅ Emulator is ready and online!"
+
+      # --- ✅ Cài đặt app & chạy test ---
+      - name: Install APK
+        run: |
+          APK_PATH=$(find ./builds/android -name "*.apk" | head -n 1)
+          echo "📦 Installing $APK_PATH"
+          adb install "$APK_PATH" || (echo "Retrying..." && adb install -r "$APK_PATH")
 
       - name: Install Maestro CLI
         run: |
@@ -197,10 +226,10 @@ jobs:
           path: results-android.xml
 
   # =========================================
-  # 🧪 MAESTRO TEST (IOS)
+  # MAESTRO TEST (IOS)
   # =========================================
   maestro-ios:
-    name: 🧪 Maestro iOS Tests (Simulator)
+    name: Maestro iOS Tests
     needs: build-ios
     runs-on: macos-latest
 
@@ -231,12 +260,44 @@ jobs:
 
       - name: Start iOS Simulator
         run: |
-          DEVICE="iPhone 15"
-          echo "Booting simulator: $DEVICE"
-          xcrun simctl bootstatus "$DEVICE" -b || xcrun simctl boot "$DEVICE"
-          xcrun simctl list devices | grep Booted
+          echo "🔍 Listing available iOS simulators..."
+          xcrun simctl list devices | grep "iPhone" || true
+
+          DEVICE=$(xcrun simctl list devices available | grep -m1 "iPhone" | awk -F '[()]' '{print $2}')
+          if [ -z "$DEVICE" ]; then
+            echo "❌ No iPhone simulator found!"
+            exit 1
+          fi
+
+          echo "📱 Booting simulator with UDID: $DEVICE"
+          xcrun simctl boot "$DEVICE" || true
+          xcrun simctl bootstatus "$DEVICE" -b
           sleep 10
-          echo "✅ iOS simulator ready"
+          echo "✅ iOS Simulator ready"
+
+      - name: Install iOS app to simulator
+        run: |
+          DEVICE=$(xcrun simctl list devices booted | grep -m1 "iPhone" | awk -F '[()]' '{print $2}')
+          IPA_PATH=$(find ./builds/ios -name "*.ipa" | head -n 1)
+
+          if [ -z "$IPA_PATH" ]; then
+            echo "❌ No .ipa file found in ./builds/ios"
+            exit 1
+          fi
+
+          echo "📦 Installing app to simulator: $DEVICE"
+          TMP_DIR=$(mktemp -d)
+          unzip -q "$IPA_PATH" -d "$TMP_DIR"
+          APP_PATH=$(find "$TMP_DIR" -name "*.app" | head -n 1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ Could not find .app inside the .ipa file"
+            exit 1
+          fi
+
+          xcrun simctl install "$DEVICE" "$APP_PATH"
+          xcrun simctl launch "$DEVICE" $(cat ios_appid.txt) || true
+          echo "✅ App installed successfully"
 
       - name: Run Maestro iOS Tests
         run: |
