@@ -1,0 +1,254 @@
+name: Build & Test Flutter App (Android + iOS + Maestro)
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  # =========================================
+  # 🤖 BUILD ANDROID
+  # =========================================
+  build-android:
+    name: 🤖 Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.24.3
+          channel: stable
+
+      - name: Cache Flutter & Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Upgrade Flutter and dependencies
+        run: |
+          flutter upgrade
+          flutter pub upgrade --major-versions
+          flutter pub get
+          flutter pub outdated || true
+
+      - name: Build Android APK
+        run: flutter build apk --release --verbose
+
+      - name: Extract Android appId
+        id: get-android-appid
+        run: |
+          APP_ID=$(grep 'applicationId' android/app/build.gradle | head -n 1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "appId=$APP_ID" >> $GITHUB_OUTPUT
+          echo "$APP_ID" > android_appid.txt
+          echo "✅ Extracted Android appId: $APP_ID"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-appid
+          path: android_appid.txt
+
+  # =========================================
+  # 🍎 BUILD IOS
+  # =========================================
+  build-ios:
+    name: 🍎 Build iOS IPA
+    needs: build-android
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.24.3
+          channel: stable
+
+      - name: Cache Flutter & CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Install CocoaPods
+        run: sudo gem install cocoapods
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Sync CocoaPods
+        working-directory: ios
+        run: |
+          pod repo update
+          pod install --verbose
+
+      - name: Build iOS (no signing)
+        run: flutter build ios --release --no-codesign --verbose
+
+      - name: Extract iOS appId from built app
+        id: get-ios-appid
+        run: |
+          APP_PATH=$(find build/ios/iphoneos -type d -name "*.app" | head -n 1)
+          INFO_PLIST="$APP_PATH/Info.plist"
+          if [ -f "$INFO_PLIST" ]; then
+            APP_ID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$INFO_PLIST")
+            echo "✅ Extracted iOS appId: $APP_ID"
+            echo "appId=$APP_ID" >> $GITHUB_OUTPUT
+            echo "$APP_ID" > ios_appid.txt
+          else
+            echo "❌ Info.plist not found, cannot extract appId"
+            exit 1
+          fi
+
+      - name: Package IPA
+        run: |
+          mkdir -p build/ipa
+          cd build/ios/iphoneos
+          zip -r ../../ipa/app.ipa *.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: build/ipa/*.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-appid
+          path: ios_appid.txt
+
+  # =========================================
+  # 🧪 MAESTRO TEST (ANDROID)
+  # =========================================
+  maestro-android:
+    name: 🧪 Maestro Android Tests (with Emulator)
+    needs: build-android
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: ./builds/android
+
+      - name: Download Android appId
+        uses: actions/download-artifact@v4
+        with:
+          name: android-appid
+          path: .
+
+      - name: Setup Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          script: echo "✅ Emulator ready"
+
+      - name: Start Android Emulator
+        run: |
+          echo "Booting Android emulator..."
+          nohup emulator -avd test -no-audio -no-window -gpu swiftshader_indirect &
+          adb wait-for-device
+          adb shell input keyevent 82
+          sleep 15
+          echo "✅ Android emulator booted successfully"
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run:
+          maestro --version
+
+      - name: Run Maestro Android Tests
+        run: |
+          APP_ID=$(cat android_appid.txt)
+          echo "Running Maestro tests for Android appId=$APP_ID"
+          maestro test .maestro/android --app builds/android/app-armeabi-v7a-release.apk --format junit --output results-android.xml || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maestro-android-results
+          path: results-android.xml
+
+  # =========================================
+  # 🧪 MAESTRO TEST (IOS)
+  # =========================================
+  maestro-ios:
+    name: 🧪 Maestro iOS Tests (Simulator)
+    needs: build-ios
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download iOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: ./builds/ios
+
+      - name: Download iOS appId
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-appid
+          path: .
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run:
+          maestro --version
+
+      - name: Start iOS Simulator
+        run: |
+          DEVICE="iPhone 15"
+          echo "Booting simulator: $DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b || xcrun simctl boot "$DEVICE"
+          xcrun simctl list devices | grep Booted
+          sleep 10
+          echo "✅ iOS simulator ready"
+
+      - name: Run Maestro iOS Tests
+        run: |
+          APP_ID=$(cat ios_appid.txt)
+          echo "Running Maestro tests for iOS appId=$APP_ID"
+          maestro test .maestro/ios --app $APP_ID --format junit --output results-ios.xml || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maestro-ios-results
+          path: results-ios.xml

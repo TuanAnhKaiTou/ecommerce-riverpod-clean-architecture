@@ -48,7 +48,6 @@ jobs:
         id: get-android-appid
         run: |
           APP_ID=$(grep 'applicationId' android/app/build.gradle | head -n 1 | sed 's/.*"\(.*\)".*/\1/')
-          echo "appId=$APP_ID" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Print Android App ID
