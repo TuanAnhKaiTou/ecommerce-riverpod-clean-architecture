@@ -30,8 +30,8 @@ jobs:
         with:
           flutter-version: 3.24.3
       - run: flutter pub get
-      - run: flutter build ios --release --no-codesign
       - run: pod install
+      - run: flutter build ios --release --no-codesign
       - run: |
           mkdir -p build/ipa
           cd build/ios/iphoneos
