@@ -39,7 +39,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Android APK
-        run: flutter build apk --release --verbose
+        run: flutter build apk --release
 
       - name: Extract Android appId
         id: get-android-appid
@@ -98,10 +98,10 @@ jobs:
         working-directory: ios
         run: |
           pod repo update
-          pod install --verbose
+          pod install
 
       - name: Build iOS (no signing)
-        run: flutter build ios --release --no-codesign --verbose
+        run: flutter build ios --release --no-codesign
 
       - name: Extract iOS appId from built app
         id: get-ios-appid
@@ -232,7 +232,7 @@ jobs:
         run: |
           APP_ID=$(cat android_appid.txt)
           echo "Running Maestro tests for Android appId=$APP_ID"
-          maestro test .maestro/android --app builds/android/app-armeabi-v7a-release.apk --format junit --output results-android.xml || true
+          maestro test -e APP_ID=$APP_ID .maestro/login.yaml --format junit --output results-android.xml || true
 
       - uses: actions/upload-artifact@v4
         with:
@@ -317,7 +317,7 @@ jobs:
         run: |
           APP_ID=$(cat ios_appid.txt)
           echo "Running Maestro tests for iOS appId=$APP_ID"
-          maestro test .maestro/ios --app $APP_ID --format junit --output results-ios.xml || true
+          maestro test -e APP_ID=$APP_ID .maestro/login.yaml --format junit --output results-ios.xml || true
 
       - uses: actions/upload-artifact@v4
         with:
