@@ -158,12 +158,26 @@ jobs:
           name: android-appid
           path: .
 
-      - name: Setup Android environment
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
-          sudo apt-get install -y android-sdk
-          sdkmanager --install "platform-tools" "platforms;android-34" "system-images;android-34;google_apis;x86_64" "emulator"
+      - name: Setup Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb kill-server || true
+            adb start-server
+            nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+            adb wait-for-device
+            timeout=300
+            while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ] && [ $timeout -gt 0 ]; do
+              sleep 5
+              timeout=$((timeout - 5))
+              echo "Waiting for emulator... ($timeout sec left)"
+            done
+            adb devices
+            echo "✅ Emulator booted successfully!"
 
       - name: Start Android Emulator
         run: |
