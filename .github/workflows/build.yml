@@ -36,9 +36,10 @@ jobs:
         run: |
           pod repo update
           pod install --verbose
-      - run: pod install
-      - run: flutter build ios --release --no-codesign
-      - run: |
+      - name: Build iOS App
+        run: flutter build ios --release --no-codesign
+      - name: Package IPA
+        run: |
           mkdir -p build/ipa
           cd build/ios/iphoneos
           zip -r ../../ipa/ecommerce_app.ipa *.app
