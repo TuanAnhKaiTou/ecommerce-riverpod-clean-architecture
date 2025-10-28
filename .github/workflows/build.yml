@@ -43,6 +43,17 @@ jobs:
       - name: Build Android APK
         run: flutter build apk --release
 
+      # --- Extract appId from build.gradle ---
+      - name: Extract Android appId
+        id: get-android-appid
+        run: |
+          APP_ID=$(grep 'applicationId' android/app/build.gradle | head -n 1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "appId=$APP_ID" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Print Android App ID
+        run: echo "Android App ID is ${{ steps.get-android-appid.outputs.appId }}"
+
       # --- Upload artifact ---
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -82,6 +93,18 @@ jobs:
       - name: Build iOS App
         run: flutter build ios --release --no-codesign
 
+      # --- Extract appId from Info.plist ---
+      - name: Extract iOS appId
+        id: get-ios-appid
+        run: |
+          APP_ID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" ios/Runner/Info.plist)
+          echo "appId=$APP_ID" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Print iOS App ID
+        run: echo "iOS App ID is ${{ steps.get-ios-appid.outputs.appId }}"
+
+
       # --- Package IPA ---
       - name: Package IPA
         run: |
@@ -104,21 +127,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- Setup Flutter for integration test environment ---
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
         with:
-          flutter-version: 3.24.3
-          channel: stable
+          name: android-debug
+          path: artifacts/android
 
-      # --- Cache Flutter dependencies ---
-      - name: Cache Flutter dependencies
-        uses: actions/cache@v4
+      - name: Download iOS Artifact
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-maestro-flutter-${{ hashFiles('pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-maestro-flutter-
+          name: ios-debug
+          path: artifacts/ios
+
+      # # --- Setup Flutter for integration test environment ---
+      # - name: Setup Flutter
+      #   uses: subosito/flutter-action@v2
+      #   with:
+      #     flutter-version: 3.24.3
+      #     channel: stable
+
+      # # --- Cache Flutter dependencies ---
+      # - name: Cache Flutter dependencies
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: ~/.pub-cache
+      #     key: ${{ runner.os }}-maestro-flutter-${{ hashFiles('pubspec.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-maestro-flutter-
 
       # --- Install Maestro ---
       - name: Install Maestro CLI
@@ -131,14 +166,25 @@ jobs:
           maestro --version
 
       # --- Run Maestro tests for Android & iOS builds ---
-      - name: Run Maestro Tests
+      - name: Run Maestro Android Tests
         run: |
           echo "Starting Maestro local test suite..."
-          maestro test .maestro/login.yaml --format junit --output results.xml || true
+          maestro test .maestro/login.yaml --format junit --output report/android_results.xml || true
+        env:
+          MAESTRO_DRIVER: android
+          MAESTRO_APP: artifacts/android/*.apk
+
+      - name: Run Maestro iOS Tests
+        run: |
+          echo "Starting Maestro local test suite..."
+          maestro test .maestro/login.yaml --format junit --output report/ios_results.xml || true
+        env:
+          MAESTRO_DRIVER: ios
+          MAESTRO_APP: artifacts/ios/*.ipa
 
       # --- Upload test results ---
       - name: Upload Maestro test results
         uses: actions/upload-artifact@v4
         with:
-          name: maestro-results
-          path: results.xml
+          name: test-results
+          path: reports/*.xml
