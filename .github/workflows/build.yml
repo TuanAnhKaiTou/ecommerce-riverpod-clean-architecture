@@ -1,4 +1,4 @@
-name: Build Flutter Ecommerce App (Android → iOS)
+name: Build Flutter E-commerce App
 
 on:
   push:
@@ -7,43 +7,96 @@ on:
     branches: [master]
 
 jobs:
-  # build-android:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: subosito/flutter-action@v2
-  #       with:
-  #         flutter-version: 3.24.3
-  #     - run: flutter pub get
-  #     - run: flutter build apk --release
-  #     - uses: actions/upload-artifact@v4
-  #       with:
-  #         name: android-apk
-  #         path: build/app/outputs/flutter-apk/app-release.apk
+  build-android:
+    name: 🤖 Build Android APK
+    runs-on: ubuntu-latest
 
-  build-ios:
-    # needs: build-android
-    runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      # --- Checkout source ---
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Setup Flutter ---
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.24.3
-      - run: pod --version
-      - run: flutter pub get
+          channel: stable
+
+      # --- Cache Flutter & Gradle ---
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      # --- Dependency setup & upgrade ---
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Check outdated dependencies
+        run: flutter pub outdated || true
+
+      - name: Upgrade Flutter packages
+        run: flutter upgrade || true
+
+      # --- Build Android APK ---
+      - name: Build Android APK
+        run: flutter build apk --release --split-per-abi --verbose
+
+      # --- Upload artifact ---
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/*.apk
+
+  build-ios:
+    name: 🍎 Build iOS IPA
+    needs: build-android
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.24.3
+          channel: stable
+
+      - name: Install CocoaPods
+        run: sudo gem install cocoapods
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # --- CocoaPods sync fix ---
       - name: Install CocoaPods dependencies
         working-directory: ios
         run: |
           pod repo update
           pod install --verbose
+
+      # --- Build iOS IPA ---
       - name: Build iOS App
         run: flutter build ios --release --no-codesign
+
+      # --- Package IPA ---
       - name: Package IPA
         run: |
           mkdir -p build/ipa
           cd build/ios/iphoneos
           zip -r ../../ipa/ecommerce_app.ipa *.app
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload iOS IPA
+        uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
           path: build/ipa/*.ipa
