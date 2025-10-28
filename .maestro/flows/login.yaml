@@ -1,0 +1,19 @@
+appId: com.example.ecommerceRiverpod
+name: Login Flow
+onFlowStart:
+  - launchApp
+  - clearState
+
+steps:
+  - tapOn:
+      text: "Login"
+  - tapOn:
+      id: "emailField"
+  - inputText: "testuser@example.com"
+  - tapOn:
+      id: "passwordField"
+  - inputText: "password123"
+  - tapOn:
+      text: "Sign In"
+  - assertVisible:
+      text: "Welcome back"

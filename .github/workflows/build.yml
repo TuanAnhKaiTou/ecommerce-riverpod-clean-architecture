@@ -35,15 +35,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-flutter-
 
-      # --- Dependency setup & upgrade ---
+      # --- Dependency setup ---
       - name: Install Flutter dependencies
         run: flutter pub get
-
-      # - name: Check outdated dependencies
-      #   run: flutter pub outdated || true
-
-      # - name: Upgrade Flutter packages
-      #   run: flutter upgrade || true
 
       # --- Build Android APK ---
       - name: Build Android APK
@@ -100,3 +94,48 @@ jobs:
         with:
           name: ios-ipa
           path: build/ipa/*.ipa
+
+  maestro-test:
+    name: 🧪 Run Maestro Tests
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Setup Flutter for integration test environment ---
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.24.3
+          channel: stable
+
+      # --- Cache Flutter dependencies ---
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-maestro-flutter-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-maestro-flutter-
+
+      # --- Install Maestro ---
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+          maestro --version
+
+      # --- Run Maestro tests for Android & iOS builds ---
+      - name: Run Maestro Tests
+        run: |
+          echo "Starting Maestro local test suite..."
+          maestro test .maestro --format junit --output results.xml || true
+
+      # --- Upload test results ---
+      - name: Upload Maestro test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-results
+          path: results.xml
