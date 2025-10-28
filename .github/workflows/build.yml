@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-android:
-    name: 🤖 Build Android APK
+    name: 🤖 Build Android
     runs-on: ubuntu-latest
 
     steps:
@@ -62,7 +62,7 @@ jobs:
           path: build/app/outputs/flutter-apk/*.apk
 
   build-ios:
-    name: 🍎 Build iOS IPA
+    name: 🍎 Build iOS
     needs: build-android
     runs-on: macos-latest
 
@@ -89,18 +89,19 @@ jobs:
           pod repo update
           pod install --verbose
 
-      # --- Build iOS IPA ---
-      - name: Build iOS App
-        run: flutter build ios --release --no-codesign
-
-      # --- Extract appId from Info.plist ---
+      # --- Extract iOS appId ---
       - name: Extract iOS appId
         id: get-ios-appid
         run: |
           APP_ID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" ios/Runner/Info.plist)
           echo "appId=$APP_ID" >> $GITHUB_OUTPUT
-        shell: bash
+          echo "Extracted iOS App ID: $APP_ID"
 
+      # --- Build iOS IPA ---
+      - name: Build iOS App
+        run: flutter build ios --release --no-codesign
+
+      # --- Print iOS App ID---
       - name: Print iOS App ID
         run: echo "iOS App ID is ${{ steps.get-ios-appid.outputs.appId }}"
 
@@ -130,14 +131,14 @@ jobs:
       - name: Download Android Artifact
         uses: actions/download-artifact@v4
         with:
-          name: android-debug
-          path: artifacts/android
+          name: android
+          path: ./builds/android
 
       - name: Download iOS Artifact
         uses: actions/download-artifact@v4
         with:
-          name: ios-debug
-          path: artifacts/ios
+          name: ios
+          path: ./builds/ios
 
       # # --- Setup Flutter for integration test environment ---
       # - name: Setup Flutter
