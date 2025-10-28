@@ -35,12 +35,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-flutter-
 
-      - name: Upgrade Flutter and dependencies
-        run: |
-          flutter upgrade
-          flutter pub upgrade --major-versions
-          flutter pub get
-          flutter pub outdated || true
+      - name: Install Flutter dependencies
+        run: flutter pub get
 
       - name: Build Android APK
         run: flutter build apk --release --verbose
