@@ -19,6 +19,9 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v3
+
       - name: run tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
