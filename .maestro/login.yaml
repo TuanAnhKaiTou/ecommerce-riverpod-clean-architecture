@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: com.example.ecommerece_riverpod
 name: Login Flow
 ---
 - launchApp
