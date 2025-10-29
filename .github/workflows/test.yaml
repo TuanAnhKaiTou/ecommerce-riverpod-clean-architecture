@@ -7,59 +7,9 @@ on:
     branches: [ master, main ]
 
 jobs:
-  # build-android:
-  #   name: Build Android APK
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: Checkout source
-  #       uses: actions/checkout@v4
-
-  #     - name: Setup Flutter
-  #       uses: subosito/flutter-action@v2
-  #       with:
-  #         flutter-version: 3.24.3
-  #         channel: stable
-
-  #     - name: Cache Flutter & Gradle
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: |
-  #           ~/.pub-cache
-  #           ~/.gradle/caches
-  #           ~/.gradle/wrapper
-  #         key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-flutter-
-
-  #     - name: Install Flutter dependencies
-  #       run: flutter pub get
-
-  #     - name: Build Android APK
-  #       run: flutter build apk --release
-
-  #     - name: Extract Android appId
-  #       id: get-android-appid
-  #       run: |
-  #         APP_ID=$(grep 'applicationId' android/app/build.gradle | head -n 1 | sed 's/.*"\(.*\)".*/\1/')
-  #         echo "appId=$APP_ID" >> $GITHUB_OUTPUT
-  #         echo "$APP_ID" > android_appid.txt
-  #         echo "✅ Extracted Android appId: $APP_ID"
-
-  #     - uses: actions/upload-artifact@v4
-  #       with:
-  #         name: android-apk
-  #         path: build/app/outputs/flutter-apk/*.apk
-
-  #     - uses: actions/upload-artifact@v4
-  #       with:
-  #         name: android-appid
-  #         path: android_appid.txt
-
-  build-ios:
-    name: Build iOS IPA
-    # needs: build-android
-    runs-on: macos-latest
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout source
@@ -71,249 +21,293 @@ jobs:
           flutter-version: 3.24.3
           channel: stable
 
-      # - name: Cache Flutter & CocoaPods
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       ~/.pub-cache
-      #       ios/Pods
-      #       ~/Library/Caches/CocoaPods
-      #     key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-flutter-
+      - name: Cache Flutter & Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
 
-      - name: Install CocoaPods
-        run: sudo gem install cocoapods
-
-      - name: Get dependencies
+      - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Sync CocoaPods
-        working-directory: ios
-        run: |
-          pod repo update
-          pod install
+      - name: Build Android APK
+        run: flutter build apk --release
 
-      - name: Build iOS (no signing)
-        run: flutter build ios --release --no-codesign
-
-      - name: Extract iOS appId from built app
-        id: get-ios-appid
+      - name: Extract Android appId
+        id: get-android-appid
         run: |
-          APP_PATH=$(find build/ios/iphoneos -type d -name "*.app" | head -n 1)
-          INFO_PLIST="$APP_PATH/Info.plist"
-          if [ -f "$INFO_PLIST" ]; then
-            APP_ID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$INFO_PLIST")
-            echo "✅ Extracted iOS appId: $APP_ID"
-            echo "appId=$APP_ID" >> $GITHUB_OUTPUT
-            echo "$APP_ID" > ios_appid.txt
-          else
-            echo "❌ Info.plist not found, cannot extract appId"
-            exit 1
-          fi
-
-      - name: Package IPA
-        run: |
-          mkdir -p build/ipa
-          cd build/ios/iphoneos
-          zip -r ../../ipa/app.ipa *.app
+          APP_ID=$(grep 'applicationId' android/app/build.gradle | head -n 1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "appId=$APP_ID" >> $GITHUB_OUTPUT
+          echo "$APP_ID" > android_appid.txt
+          echo "✅ Extracted Android appId: $APP_ID"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa
-          path: build/ipa/*.ipa
+          name: android-apk
+          path: build/app/outputs/flutter-apk/*.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-appid
-          path: ios_appid.txt
+          name: android-appid
+          path: android_appid.txt
 
-  # maestro-android:
-  #   name: Maestro Android Tests
+  # build-ios:
+  #   name: Build iOS IPA
   #   needs: build-android
-  #   runs-on: ubuntu-latest
+  #   runs-on: macos-latest
 
   #   steps:
-  #     - name: Checkout repository
+  #     - name: Checkout source
   #       uses: actions/checkout@v4
 
-  #     - name: Download Android artifact
-  #       uses: actions/download-artifact@v4
+  #     - name: Setup Flutter
+  #       uses: subosito/flutter-action@v2
   #       with:
-  #         name: android-apk
-  #         path: ./builds/android
+  #         flutter-version: 3.24.3
+  #         channel: stable
 
-  #     - name: Download Android appId
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: android-appid
-  #         path: .
+  #     # - name: Cache Flutter & CocoaPods
+  #     #   uses: actions/cache@v4
+  #     #   with:
+  #     #     path: |
+  #     #       ~/.pub-cache
+  #     #       ios/Pods
+  #     #       ~/Library/Caches/CocoaPods
+  #     #     key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
+  #     #     restore-keys: |
+  #     #       ${{ runner.os }}-flutter-
 
-  #     - name: Setup Android Emulator
-  #       uses: reactivecircus/android-emulator-runner@v2
-  #       with:
-  #         api-level: 34
-  #         target: google_apis
-  #         arch: x86_64
-  #         profile: pixel_6
-  #         script: |
-  #           adb kill-server || true
-  #           adb start-server
-  #           nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
-  #           adb wait-for-device
-  #           timeout=300
-  #           while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ] && [ $timeout -gt 0 ]; do
-  #             sleep 5
-  #             timeout=$((timeout - 5))
-  #             echo "Waiting for emulator... ($timeout sec left)"
-  #           done
-  #           adb devices
-  #           echo "✅ Emulator booted successfully!"
+  #     - name: Install CocoaPods
+  #       run: sudo gem install cocoapods
 
-  #     - name: Start Android Emulator
+  #     - name: Get dependencies
+  #       run: flutter pub get
+
+  #     - name: Sync CocoaPods
+  #       working-directory: ios
   #       run: |
-  #         echo "🧩 Creating AVD device (Pixel_6_API_34)..."
-  #         echo "no" | avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d "pixel_6" || true
+  #         pod repo update
+  #         pod install
 
-  #         echo "🚀 Starting emulator..."
-  #         nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+  #     - name: Build iOS (no signing)
+  #       run: flutter build ios --release --no-codesign
 
-  #         echo "⏳ Waiting for ADB device..."
-  #         adb kill-server || true
-  #         adb start-server
-  #         adb wait-for-device
-
-  #         boot_completed=""
-  #         timeout=300
-  #         while [ -z "$boot_completed" ] && [ $timeout -gt 0 ]; do
-  #           boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
-  #           if [ "$boot_completed" != "1" ]; then
-  #             sleep 5
-  #             timeout=$((timeout - 5))
-  #             echo "Still waiting... ($timeout sec left)"
-  #           fi
-  #         done
-
-  #         if [ "$boot_completed" != "1" ]; then
-  #           echo "❌ Emulator failed to boot properly!"
-  #           adb logcat -d
+  #     - name: Extract iOS appId from built app
+  #       id: get-ios-appid
+  #       run: |
+  #         APP_PATH=$(find build/ios/iphoneos -type d -name "*.app" | head -n 1)
+  #         INFO_PLIST="$APP_PATH/Info.plist"
+  #         if [ -f "$INFO_PLIST" ]; then
+  #           APP_ID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$INFO_PLIST")
+  #           echo "✅ Extracted iOS appId: $APP_ID"
+  #           echo "appId=$APP_ID" >> $GITHUB_OUTPUT
+  #           echo "$APP_ID" > ios_appid.txt
+  #         else
+  #           echo "❌ Info.plist not found, cannot extract appId"
   #           exit 1
   #         fi
 
-  #         adb devices
-  #         echo "✅ Emulator is ready and online!"
-
-  #     # --- ✅ Cài đặt app & chạy test ---
-  #     - name: Install APK
+  #     - name: Package IPA
   #       run: |
-  #         APK_PATH=$(find ./builds/android -name "*.apk" | head -n 1)
-  #         echo "📦 Installing $APK_PATH"
-  #         adb install "$APK_PATH" || (echo "Retrying..." && adb install -r "$APK_PATH")
-
-  #     - name: Install Maestro CLI
-  #       run: |
-  #         curl -Ls "https://get.maestro.mobile.dev" | bash
-  #         echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-
-  #     - name: Verify Maestro installation
-  #       run:
-  #         maestro --version
-
-  #     - name: Run Maestro Android Tests
-  #       run: |
-  #         APP_ID=$(cat android_appid.txt)
-  #         echo "Running Maestro tests for Android appId=$APP_ID"
-  #         maestro test -e APP_ID=$APP_ID .maestro/login.yaml --format junit --output results-android.xml || true
+  #         mkdir -p build/ipa
+  #         cd build/ios/iphoneos
+  #         zip -r ../../ipa/app.ipa *.app
 
   #     - uses: actions/upload-artifact@v4
   #       with:
-  #         name: maestro-android-results
-  #         path: results-android.xml
+  #         name: ios-ipa
+  #         path: build/ipa/*.ipa
 
-  maestro-ios:
-    name: Maestro iOS Tests
-    needs: build-ios
-    runs-on: macos-latest
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ios-appid
+  #         path: ios_appid.txt
+
+  maestro-android:
+    name: Maestro Android Tests
+    needs: build-android
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
         with:
-          xcode-version: latest
-      - run: xcodebuild -project Runner.xcodeproj -scheme Runner -destination 'platform=iOS Simulator,name=iPhone 11'
+          name: android-apk
+          path: ./builds/android
 
-      # - name: Download iOS artifact
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: ios-ipa
-      #     path: ./builds/ios
+      - name: Download Android appId
+        uses: actions/download-artifact@v4
+        with:
+          name: android-appid
+          path: .
 
-      # - name: Download iOS appId
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: ios-appid
-      #     path: .
+      - name: Setup Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb kill-server || true
+            adb start-server
+            nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+            adb wait-for-device
+            timeout=300
+            while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ] && [ $timeout -gt 0 ]; do
+              sleep 5
+              timeout=$((timeout - 5))
+              echo "Waiting for emulator... ($timeout sec left)"
+            done
+            adb devices
+            echo "✅ Emulator booted successfully!"
 
-      # - name: Install Maestro CLI
-      #   run: |
-      #     curl -Ls "https://get.maestro.mobile.dev" | bash
-      #     echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-
-      # - name: Verify Maestro installation
-      #   run:
-      #     maestro --version
-
-      # - name: Start iOS Simulator
-      #   run: |
-      #     echo "🔍 Listing available iOS simulators..."
-      #     xcrun simctl list devices | grep "iPhone" || true
-
-      #     DEVICE=$(xcrun simctl list devices available | grep -m1 "iPhone" | awk -F '[()]' '{print $2}')
-      #     if [ -z "$DEVICE" ]; then
-      #       echo "❌ No iPhone simulator found!"
-      #       exit 1
-      #     fi
-
-      #     echo "📱 Booting simulator with UDID: $DEVICE"
-      #     xcrun simctl boot "$DEVICE" || true
-      #     xcrun simctl bootstatus "$DEVICE" -b
-      #     sleep 10
-      #     echo "✅ iOS Simulator ready"
-
-      # - name: Install iOS app to simulator
-      #   run: |
-      #     DEVICE=$(xcrun simctl list devices booted | grep -m1 "iPhone" | awk -F '[()]' '{print $2}')
-      #     IPA_PATH=$(find ./builds/ios -name "*.ipa" | head -n 1)
-
-      #     if [ -z "$IPA_PATH" ]; then
-      #       echo "❌ No .ipa file found in ./builds/ios"
-      #       exit 1
-      #     fi
-
-      #     echo "📦 Installing app to simulator: $DEVICE"
-      #     TMP_DIR=$(mktemp -d)
-      #     unzip -q "$IPA_PATH" -d "$TMP_DIR"
-      #     APP_PATH=$(find "$TMP_DIR" -name "*.app" | head -n 1)
-
-      #     if [ -z "$APP_PATH" ]; then
-      #       echo "❌ Could not find .app inside the .ipa file"
-      #       exit 1
-      #     fi
-
-      #     xcrun simctl install "$DEVICE" "$APP_PATH"
-      #     xcrun simctl launch "$DEVICE" $(cat ios_appid.txt) || true
-      #     echo "✅ App installed successfully"
-
-      - name: Run Maestro iOS Tests
+      - name: Start Android Emulator
         run: |
-          APP_ID=$(cat ios_appid.txt)
-          echo "Running Maestro tests for iOS appId=$APP_ID"
-          maestro test -e APP_ID=$APP_ID .maestro/login.yaml --format junit --output results-ios.xml || true
+          echo "🧩 Creating AVD device (Pixel_6_API_34)..."
+          echo "no" | avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d "pixel_6" || true
+
+          echo "🚀 Starting emulator..."
+          nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+
+          echo "⏳ Waiting for ADB device..."
+          adb kill-server || true
+          adb start-server
+          adb wait-for-device
+
+          boot_completed=""
+          timeout=300
+          while [ -z "$boot_completed" ] && [ $timeout -gt 0 ]; do
+            boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            if [ "$boot_completed" != "1" ]; then
+              sleep 5
+              timeout=$((timeout - 5))
+              echo "Still waiting... ($timeout sec left)"
+            fi
+          done
+
+          if [ "$boot_completed" != "1" ]; then
+            echo "❌ Emulator failed to boot properly!"
+            adb logcat -d
+            exit 1
+          fi
+
+          adb devices
+          echo "✅ Emulator is ready and online!"
+
+      # --- ✅ Cài đặt app & chạy test ---
+      - name: Install APK
+        run: |
+          APK_PATH=$(find ./builds/android -name "*.apk" | head -n 1)
+          echo "📦 Installing $APK_PATH"
+          adb install "$APK_PATH" || (echo "Retrying..." && adb install -r "$APK_PATH")
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run:
+          maestro --version
+
+      - name: Run Maestro Android Tests
+        run: |
+          APP_ID=$(cat android_appid.txt)
+          echo "Running Maestro tests for Android appId=$APP_ID"
+          maestro test -e APP_ID=$APP_ID .maestro/login.yaml --format junit --output results-android.xml || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: maestro-ios-results
-          path: results-ios.xml
+          name: maestro-android-results
+          path: results-android.xml
+
+  # maestro-ios:
+  #   name: Maestro iOS Tests
+  #   needs: build-ios
+  #   runs-on: macos-latest
+
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+
+  #     # - name: Download iOS artifact
+  #     #   uses: actions/download-artifact@v4
+  #     #   with:
+  #     #     name: ios-ipa
+  #     #     path: ./builds/ios
+
+  #     # - name: Download iOS appId
+  #     #   uses: actions/download-artifact@v4
+  #     #   with:
+  #     #     name: ios-appid
+  #     #     path: .
+
+  #     # - name: Install Maestro CLI
+  #     #   run: |
+  #     #     curl -Ls "https://get.maestro.mobile.dev" | bash
+  #     #     echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+  #     # - name: Verify Maestro installation
+  #     #   run:
+  #     #     maestro --version
+
+  #     # - name: Start iOS Simulator
+  #     #   run: |
+  #     #     echo "🔍 Listing available iOS simulators..."
+  #     #     xcrun simctl list devices | grep "iPhone" || true
+
+  #     #     DEVICE=$(xcrun simctl list devices available | grep -m1 "iPhone" | awk -F '[()]' '{print $2}')
+  #     #     if [ -z "$DEVICE" ]; then
+  #     #       echo "❌ No iPhone simulator found!"
+  #     #       exit 1
+  #     #     fi
+
+  #     #     echo "📱 Booting simulator with UDID: $DEVICE"
+  #     #     xcrun simctl boot "$DEVICE" || true
+  #     #     xcrun simctl bootstatus "$DEVICE" -b
+  #     #     sleep 10
+  #     #     echo "✅ iOS Simulator ready"
+
+  #     # - name: Install iOS app to simulator
+  #     #   run: |
+  #     #     DEVICE=$(xcrun simctl list devices booted | grep -m1 "iPhone" | awk -F '[()]' '{print $2}')
+  #     #     IPA_PATH=$(find ./builds/ios -name "*.ipa" | head -n 1)
+
+  #     #     if [ -z "$IPA_PATH" ]; then
+  #     #       echo "❌ No .ipa file found in ./builds/ios"
+  #     #       exit 1
+  #     #     fi
+
+  #     #     echo "📦 Installing app to simulator: $DEVICE"
+  #     #     TMP_DIR=$(mktemp -d)
+  #     #     unzip -q "$IPA_PATH" -d "$TMP_DIR"
+  #     #     APP_PATH=$(find "$TMP_DIR" -name "*.app" | head -n 1)
+
+  #     #     if [ -z "$APP_PATH" ]; then
+  #     #       echo "❌ Could not find .app inside the .ipa file"
+  #     #       exit 1
+  #     #     fi
+
+  #     #     xcrun simctl install "$DEVICE" "$APP_PATH"
+  #     #     xcrun simctl launch "$DEVICE" $(cat ios_appid.txt) || true
+  #     #     echo "✅ App installed successfully"
+
+  #     - name: Run Maestro iOS Tests
+  #       run: |
+  #         APP_ID=$(cat ios_appid.txt)
+  #         echo "Running Maestro tests for iOS appId=$APP_ID"
+  #         maestro test -e APP_ID=$APP_ID .maestro/login.yaml --format junit --output results-ios.xml || true
+
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: maestro-ios-results
+  #         path: results-ios.xml
