@@ -149,66 +149,75 @@ jobs:
           name: android-appid
           path: .
 
-      # - name: Setup Android Emulator
-      #   uses: reactivecircus/android-emulator-runner@v2
-      #   with:
-      #     api-level: 34
-      #     target: google_apis
-      #     arch: x86_64
-      #     profile: pixel_6
-      #     script: |
-      #       adb kill-server || true
-      #       adb start-server
-      #       nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
-      #       adb wait-for-device
-      #       timeout=300
-      #       while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ] && [ $timeout -gt 0 ]; do
-      #         sleep 5
-      #         timeout=$((timeout - 5))
-      #         echo "Waiting for emulator... ($timeout sec left)"
-      #       done
-      #       adb devices
-      #       echo "✅ Emulator booted successfully!"
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
-      # - name: Start Android Emulator
-      #   run: |
-      #     echo "🧩 Creating AVD device (Pixel_6_API_34)..."
-      #     echo "no" | avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d "pixel_6" || true
+      # - name: Gradle cache
+      #   uses: gradle/actions/setup-gradle@v3
 
-      #     echo "🚀 Starting emulator..."
-      #     nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+      - name: Setup Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb kill-server || true
+            adb start-server
+            nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+            adb wait-for-device
+            timeout=300
+            while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ] && [ $timeout -gt 0 ]; do
+              sleep 5
+              timeout=$((timeout - 5))
+              echo "Waiting for emulator... ($timeout sec left)"
+            done
+            adb devices
+            echo "✅ Emulator booted successfully!"
 
-      #     echo "⏳ Waiting for ADB device..."
-      #     adb kill-server || true
-      #     adb start-server
-      #     adb wait-for-device
+      - name: Start Android Emulator
+        run: |
+          echo "🧩 Creating AVD device (Pixel_6_API_34)..."
+          echo "no" | avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d "pixel_6" || true
 
-      #     boot_completed=""
-      #     timeout=300
-      #     while [ -z "$boot_completed" ] && [ $timeout -gt 0 ]; do
-      #       boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
-      #       if [ "$boot_completed" != "1" ]; then
-      #         sleep 5
-      #         timeout=$((timeout - 5))
-      #         echo "Still waiting... ($timeout sec left)"
-      #       fi
-      #     done
+          echo "🚀 Starting emulator..."
+          nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
 
-      #     if [ "$boot_completed" != "1" ]; then
-      #       echo "❌ Emulator failed to boot properly!"
-      #       adb logcat -d
-      #       exit 1
-      #     fi
+          echo "⏳ Waiting for ADB device..."
+          adb kill-server || true
+          adb start-server
+          adb wait-for-device
 
-      #     adb devices
-      #     echo "✅ Emulator is ready and online!"
+          boot_completed=""
+          timeout=300
+          while [ -z "$boot_completed" ] && [ $timeout -gt 0 ]; do
+            boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            if [ "$boot_completed" != "1" ]; then
+              sleep 5
+              timeout=$((timeout - 5))
+              echo "Still waiting... ($timeout sec left)"
+            fi
+          done
 
-      # # --- ✅ Cài đặt app & chạy test ---
-      # - name: Install APK
-      #   run: |
-      #     APK_PATH=$(find ./builds/android -name "*.apk" | head -n 1)
-      #     echo "📦 Installing $APK_PATH"
-      #     adb install "$APK_PATH" || (echo "Retrying..." && adb install -r "$APK_PATH")
+          if [ "$boot_completed" != "1" ]; then
+            echo "❌ Emulator failed to boot properly!"
+            adb logcat -d
+            exit 1
+          fi
+
+          adb devices
+          echo "✅ Emulator is ready and online!"
+
+      # --- ✅ Cài đặt app & chạy test ---
+      - name: Install APK
+        run: |
+          APK_PATH=$(find ./builds/android -name "*.apk" | head -n 1)
+          echo "📦 Installing $APK_PATH"
+          adb install "$APK_PATH" || (echo "Retrying..." && adb install -r "$APK_PATH")
 
       # - name: Install Maestro CLI
       #   run: |
