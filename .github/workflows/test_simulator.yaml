@@ -24,7 +24,6 @@ jobs:
 
       - name: Run Maestro Android Tests
         run: |
-          APP_ID=$(cat android_appid.txt)
           echo "Running Maestro tests for Android appId=$APP_ID"
           maestro test .maestro/android-flow.yaml --format junit --output results-android.xml || true
 
