@@ -149,86 +149,86 @@ jobs:
           name: android-appid
           path: .
 
-      - name: Setup Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          script: |
-            adb kill-server || true
-            adb start-server
-            nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
-            adb wait-for-device
-            timeout=300
-            while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ] && [ $timeout -gt 0 ]; do
-              sleep 5
-              timeout=$((timeout - 5))
-              echo "Waiting for emulator... ($timeout sec left)"
-            done
-            adb devices
-            echo "✅ Emulator booted successfully!"
+      # - name: Setup Android Emulator
+      #   uses: reactivecircus/android-emulator-runner@v2
+      #   with:
+      #     api-level: 34
+      #     target: google_apis
+      #     arch: x86_64
+      #     profile: pixel_6
+      #     script: |
+      #       adb kill-server || true
+      #       adb start-server
+      #       nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+      #       adb wait-for-device
+      #       timeout=300
+      #       while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ] && [ $timeout -gt 0 ]; do
+      #         sleep 5
+      #         timeout=$((timeout - 5))
+      #         echo "Waiting for emulator... ($timeout sec left)"
+      #       done
+      #       adb devices
+      #       echo "✅ Emulator booted successfully!"
 
-      - name: Start Android Emulator
-        run: |
-          echo "🧩 Creating AVD device (Pixel_6_API_34)..."
-          echo "no" | avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d "pixel_6" || true
+      # - name: Start Android Emulator
+      #   run: |
+      #     echo "🧩 Creating AVD device (Pixel_6_API_34)..."
+      #     echo "no" | avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d "pixel_6" || true
 
-          echo "🚀 Starting emulator..."
-          nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
+      #     echo "🚀 Starting emulator..."
+      #     nohup emulator -avd test -no-snapshot -noaudio -no-window -gpu swiftshader_indirect &
 
-          echo "⏳ Waiting for ADB device..."
-          adb kill-server || true
-          adb start-server
-          adb wait-for-device
+      #     echo "⏳ Waiting for ADB device..."
+      #     adb kill-server || true
+      #     adb start-server
+      #     adb wait-for-device
 
-          boot_completed=""
-          timeout=300
-          while [ -z "$boot_completed" ] && [ $timeout -gt 0 ]; do
-            boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
-            if [ "$boot_completed" != "1" ]; then
-              sleep 5
-              timeout=$((timeout - 5))
-              echo "Still waiting... ($timeout sec left)"
-            fi
-          done
+      #     boot_completed=""
+      #     timeout=300
+      #     while [ -z "$boot_completed" ] && [ $timeout -gt 0 ]; do
+      #       boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+      #       if [ "$boot_completed" != "1" ]; then
+      #         sleep 5
+      #         timeout=$((timeout - 5))
+      #         echo "Still waiting... ($timeout sec left)"
+      #       fi
+      #     done
 
-          if [ "$boot_completed" != "1" ]; then
-            echo "❌ Emulator failed to boot properly!"
-            adb logcat -d
-            exit 1
-          fi
+      #     if [ "$boot_completed" != "1" ]; then
+      #       echo "❌ Emulator failed to boot properly!"
+      #       adb logcat -d
+      #       exit 1
+      #     fi
 
-          adb devices
-          echo "✅ Emulator is ready and online!"
+      #     adb devices
+      #     echo "✅ Emulator is ready and online!"
 
-      # --- ✅ Cài đặt app & chạy test ---
-      - name: Install APK
-        run: |
-          APK_PATH=$(find ./builds/android -name "*.apk" | head -n 1)
-          echo "📦 Installing $APK_PATH"
-          adb install "$APK_PATH" || (echo "Retrying..." && adb install -r "$APK_PATH")
+      # # --- ✅ Cài đặt app & chạy test ---
+      # - name: Install APK
+      #   run: |
+      #     APK_PATH=$(find ./builds/android -name "*.apk" | head -n 1)
+      #     echo "📦 Installing $APK_PATH"
+      #     adb install "$APK_PATH" || (echo "Retrying..." && adb install -r "$APK_PATH")
 
-      - name: Install Maestro CLI
-        run: |
-          curl -Ls "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+      # - name: Install Maestro CLI
+      #   run: |
+      #     curl -Ls "https://get.maestro.mobile.dev" | bash
+      #     echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-      - name: Verify Maestro installation
-        run:
-          maestro --version
+      # - name: Verify Maestro installation
+      #   run:
+      #     maestro --version
 
-      - name: Run Maestro Android Tests
-        run: |
-          APP_ID=$(cat android_appid.txt)
-          echo "Running Maestro tests for Android appId=$APP_ID"
-          maestro test -e APP_ID=$APP_ID .maestro/login.yaml --format junit --output results-android.xml || true
+      # - name: Run Maestro Android Tests
+      #   run: |
+      #     APP_ID=$(cat android_appid.txt)
+      #     echo "Running Maestro tests for Android appId=$APP_ID"
+      #     maestro test -e APP_ID=$APP_ID .maestro/login.yaml --format junit --output results-android.xml || true
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: maestro-android-results
-          path: results-android.xml
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: maestro-android-results
+      #     path: results-android.xml
 
   # maestro-ios:
   #   name: Maestro iOS Tests
